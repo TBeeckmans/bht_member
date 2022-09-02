@@ -1,0 +1,301 @@
+<?php
+
+use Drupal\Core\Access\AccessResult;
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Field\BaseFieldDefinition;
+use Drupal\Core\Field\FieldDefinitionInterface;
+use Drupal\Core\Field\FieldItemListInterface;
+use Drupal\Core\Session\AccountInterface;
+use Drupal\user\Entity\User;
+use Drupal\user\UserInterface;
+
+/**
+ * Implements hook_entity_type_alter().
+ *
+ * Add the validation check forcing members to provide at least a single phone.
+ */
+function bht_member_entity_type_alter(array &$entity_types) {
+  // Add validation contraint to the user entity.
+  $entity_types['user']->addConstraint('RequiredPhoneConstraint');
+}
+
+/**
+ * Implements hook_entity_form_mode_alter().
+ *
+ * Change the user form mode to be used to member for non-administrative users.
+ */
+function bht_member_entity_form_mode_alter(&$form_mode, EntityInterface $entity) {
+  // A member needs to use a stripped down version of the edit form.
+  if ($entity instanceof UserInterface && !$entity->hasRole('administrator') && !$entity->hasRole('webadmin') && \Drupal::currentUser()->id() === $entity->id()) {
+    $form_mode = 'member';
+  }
+}
+
+/**
+ * Implements hook_entity_field_access().
+ */
+function bht_member_entity_field_access($operation, FieldDefinitionInterface $field_definition, AccountInterface $account, FieldItemListInterface $items = NULL) {
+  if (count(array_diff($account->getRoles(), ['webadmin', 'administrator'])) != count($account->getRoles())) {
+    return AccessResult::allowed();
+  }
+
+  if ($field_definition->getTargetEntityTypeId() == 'user' && $items) {
+    $entity = $items->getParent()->getValue();
+    /* @var User $entity */
+    $fields = ['phone', 'mobile_phone', 'address'];
+    if (in_array($items->getName(), $fields)) {
+      $publication_consent = $entity->get('publication_consent')->getString();
+      if (!$entity->get($items->getName() . '_consent')->getString() || !$publication_consent) {
+        return AccessResult::forbidden();
+      }
+    }
+  }
+
+  return AccessResult::neutral();
+}
+
+/**
+ * Implements hook_entity_base_field_info().
+ */
+function bht_member_entity_base_field_info(\Drupal\Core\Entity\EntityTypeInterface $entity_type) {
+  if ($entity_type->id() === 'user') {
+    $fields = [];
+
+    $fields['published_name'] = BaseFieldDefinition::create('string')
+      ->setName('published_name')
+      ->setLabel(t('Name'))
+      ->setComputed(TRUE)
+      ->setClass('\Drupal\bht_member\PublishedName')
+      ->setDisplayOptions('form', [
+        'label' => 'above',
+        'weight' => -5,
+      ])
+      ->setDisplayConfigurable('form', TRUE)
+      ->setDisplayConfigurable('view', TRUE);
+
+    $fields['published_email'] = BaseFieldDefinition::create('string')
+      ->setName('published_email')
+      ->setLabel(t('Email'))
+      ->setComputed(TRUE)
+      ->setClass('\Drupal\bht_member\PublishedEmail')
+      ->setDisplayOptions('form', [
+        'label' => 'above',
+        'weight' => -10,
+      ])
+      ->setDisplayConfigurable('form', TRUE)
+      ->setDisplayConfigurable('view', TRUE);
+
+    $fields['email_consent'] = BaseFieldDefinition::create('boolean')
+      ->setName('email_consent')
+      ->setLabel(t('I consent to publish my e-mail address in the public member list.'))
+      ->setDefaultValue(FALSE)
+      ->setSettings([
+        'on_label' => t('Published'),
+        'off_label' => t('Unpublished'),
+      ])
+      ->setDisplayOptions('form', [
+        'label' => 'above',
+        'weight' => -10,
+      ])
+      ->setDisplayConfigurable('view', FALSE)
+      ->setDisplayConfigurable('form', TRUE);
+
+    $fields['phone'] = BaseFieldDefinition::create('telephone')
+      ->setName('phone')
+      ->setLabel('Phone')
+      ->setDisplayOptions('form', [
+        'label' => 'above',
+        'weight' => 0,
+      ])
+      ->setDisplayOptions('view', [
+        'label' => 'above',
+        'weight' => 0,
+      ])
+      ->setDisplayConfigurable('form', TRUE)
+      ->setDisplayConfigurable('view', TRUE);
+
+    $fields['phone_consent'] = BaseFieldDefinition::create('boolean')
+      ->setName('phone_consent')
+      ->setLabel(t('I consent to publish my landline phone number in the public member list.'))
+      ->setDefaultValue(FALSE)
+      ->setSettings([
+        'on_label' => t('Published'),
+        'off_label' => t('Unpublished'),
+      ])
+      ->setDisplayOptions('form', [
+        'label' => 'above',
+        'weight' => 0,
+      ])
+      ->setDisplayConfigurable('view', FALSE)
+      ->setDisplayConfigurable('form', TRUE);
+
+    $fields['mobile_phone'] = BaseFieldDefinition::create('telephone')
+      ->setName('mobile_phone')
+      ->setLabel('Mobile phone')
+      ->setDisplayOptions('form', [
+        'label' => 'above',
+        'weight' => 5,
+      ])
+      ->setDisplayOptions('view', [
+        'label' => 'above',
+        'weight' => 5,
+      ])
+      ->setDisplayConfigurable('form', TRUE)
+      ->setDisplayConfigurable('view', TRUE);
+
+    $fields['mobile_phone_consent'] = BaseFieldDefinition::create('boolean')
+      ->setName('mobile_phone_consent')
+      ->setLabel(t('I consent to publish my mobile phone number in the public member list.'))
+      ->setDefaultValue(FALSE)
+      ->setSettings([
+        'on_label' => t('Published'),
+        'off_label' => t('Unpublished'),
+      ])
+      ->setDisplayOptions('form', [
+        'label' => 'above',
+        'weight' => 5,
+      ])
+      ->setDisplayConfigurable('view', FALSE)
+      ->setDisplayConfigurable('form', TRUE);
+
+    $fields['firstname'] = BaseFieldDefinition::create('string')
+      ->setName('firstname')
+      ->setLabel(t('First Name'))
+      ->setSettings([
+        'max_length' => 255,
+        'text_processing' => 0,
+      ])
+      ->setDisplayOptions('form', [
+        'type' => 'string_textfield',
+        'weight' => -5,
+      ])
+      ->setDisplayOptions('view', [
+        'label' => 'above',
+        'type' => 'string',
+        'weight' => -5,
+      ])
+      ->setDisplayConfigurable('form', TRUE)
+      ->setDisplayConfigurable('view', TRUE);
+
+    $fields['lastname'] = BaseFieldDefinition::create('string')
+      ->setName('lastname')
+      ->setLabel(t('Name'))
+      ->setSettings([
+        'max_length' => 255,
+        'text_processing' => 0,
+      ])
+      ->setDisplayOptions('form', [
+        'type' => 'string_textfield',
+        'weight' => -4,
+      ])
+      ->setDisplayOptions('view', [
+        'label' => 'above',
+        'type' => 'string',
+        'weight' => -4,
+      ])
+      ->setDisplayConfigurable('form', TRUE)
+      ->setDisplayConfigurable('view', TRUE);
+
+    $fields['publication_consent'] = BaseFieldDefinition::create('boolean')
+      ->setName('publication_consent')
+      ->setLabel(t('I consent to publish my name in the public member list.'))
+      ->setDefaultValue(FALSE)
+      ->setSettings([
+        'on_label' => t('Published'),
+        'off_label' => t('Unpublished'),
+      ])
+      ->setDisplayOptions('form', [
+        'label' => 'above',
+        'weight' => -3,
+      ])
+      ->setDisplayConfigurable('view', FALSE)
+      ->setDisplayConfigurable('form', TRUE);
+
+    $fields['address'] = BaseFieldDefinition::create('address')
+      ->setName('address')
+      ->setLabel(t('Address'))
+      ->setDescription(t('Your <em>personal address</em> information. Your personal address information <em>will not be shown on the website</em> and will only be used by the organisation in case they need to send you documents by postal mail.'))
+      ->setSettings([
+        'fields' => [
+          'givenName' => FALSE,
+          'additionalName' => FALSE,
+          'familyName' => FALSE,
+          'organisation' => FALSE,
+          'addressLine1' => 'addressLine1',
+          'addressLine2' => FALSE,
+          'postalCode' => 'postalCode',
+          'sortingCode' => FALSE,
+          'dependentLocality' => FALSE,
+          'locality' => 'locality',
+          'administrativeArea' => FALSE,
+        ],
+        'default_value' => [
+          'langcode' => 'en',
+          'country_code' => 'BE',
+          'administrative_area' => NULL,
+          'locality' => '',
+          'dependent_locality' => NULL,
+          'postal_code' => '',
+          'sorting_code' => NULL,
+          'address_line1' => '',
+          'address_line2' => '',
+          'organisation' => '',
+          'given_name' => '',
+          'additional_name' => NULL,
+          'family_name' => '',
+        ],
+      ])
+      ->setDisplayOptions('view', array(
+        'label' => 'above',
+        'type' => 'address_default',
+        'weight' => 10,
+      ))
+      ->setDisplayOptions('form', array(
+        'type' => 'address_default',
+        'weight' => 10,
+      ))
+      ->setDisplayConfigurable('form', TRUE)
+      ->setDisplayConfigurable('view', TRUE);
+
+    $fields['address_consent'] = BaseFieldDefinition::create('boolean')
+      ->setName('address_consent')
+      ->setLabel(t('I consent to publish my address in the public member list.'))
+      ->setDefaultValue(FALSE)
+      ->setSettings([
+        'on_label' => t('Published'),
+        'off_label' => t('Unpublished'),
+      ])
+      ->setDisplayOptions('form', [
+        'label' => 'above',
+        'weight' => 10,
+      ])
+      ->setDisplayConfigurable('view', FALSE)
+      ->setDisplayConfigurable('form', TRUE);
+
+    $fields['geofield'] = BaseFieldDefinition::create('geofield')
+      ->setLabel('geofield')
+      ->setDefaultValue('')
+      ->setSettings([
+        'backend' => 'geofield_backend_default',
+        'geocoder_field' => [
+          'method' => 'geocode',
+          'field' => 'address',
+          'skip_not_empty_value' => FALSE,
+          'disabled' => FALSE,
+          'hidden' => TRUE,
+          'providers' => ['openstreetmap'],
+          'dumper' => 'wkt',
+          'delta_handling' => 'default',
+          'failure' => [
+            'handling' => 'preserve',
+            'status_message' => TRUE,
+            'log' => TRUE,
+          ],
+        ],
+      ])
+      ->setDisplayConfigurable('view', FALSE)
+      ->setDisplayConfigurable('form', TRUE);
+
+    return $fields;
+  }
+}

@@ -1,0 +1,14 @@
+{
+    "name": "bht/bht_member",
+    "type": "drupal-custom-module",
+    "keywords": ["Drupal", "bht_member"],
+    "authors": [
+      {
+        "name": "Thierry Beeckmans",
+        "email": "webmaster@bht.be"
+      }
+    ],
+    "require": {
+        "bht/bht_geolocation": "^1.0"
+    }
+}

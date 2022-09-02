@@ -1,0 +1,41 @@
+<?php
+
+use Drupal\user\Entity\Role;
+
+/**
+ * Implements hook_install().
+ */
+function bht_member_install($is_syncing) {
+  _create_member_role();
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function bht_member_uninstall($is_syncing) {
+  _uninstall_member_role();
+}
+
+/**
+ * Create the member role.
+ *
+ * @return void
+ * @throws \Drupal\Core\Entity\EntityStorageException
+ */
+function _create_member_role() {
+  $role = Role::create([
+    'id' => 'member',
+    'label' => t('Member'),
+  ]);
+  $role->save();
+}
+
+/**
+ * Uninstall the member role.
+ *
+ * @return void
+ * @throws \Drupal\Core\Entity\EntityStorageException
+ */
+function _uninstall_member_role() {
+  Role::load('member')?->delete();
+}

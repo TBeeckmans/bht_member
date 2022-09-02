@@ -1,0 +1,8 @@
+name: BHT Member
+type: module
+description: Provides member functionality.
+package: BHT
+core_version_requirement: ^9
+dependencies:
+  - bht_geolocation
+  - telephone
